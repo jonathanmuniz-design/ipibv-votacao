@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#22385A">
+<title>4-Assistente IPIBV Atas – Votação</title>
+<style>
+:root{--bg:#EEF1F5;--surface:#fff;--ink:#1B2433;--muted:#5B6678;--line:#D3D9E2;--accent:#22385A;--accent-ink:#fff;--ok:#2B7A4B;--danger:#A3302B;--gold:#9A6B12;--gold-soft:#F6ECD3}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1621;--surface:#18212F;--ink:#E8EDF4;--muted:#9AA6B8;--line:#2C3849;--accent:#9DB7E0;--accent-ink:#0F1621;--ok:#6CCB91;--danger:#F08A84;--gold:#E0B14C;--gold-soft:#3A2F17}}
+:root[data-theme="dark"]{--bg:#0F1621;--surface:#18212F;--ink:#E8EDF4;--muted:#9AA6B8;--line:#2C3849;--accent:#9DB7E0;--accent-ink:#0F1621;--ok:#6CCB91;--danger:#F08A84;--gold:#E0B14C;--gold-soft:#3A2F17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{background:#22385A;color:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 12px}
+header small{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}header b{font:700 22px Georgia,serif}
+main{max-width:560px;margin:0 auto;padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px));display:grid;gap:14px}
+.card{background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:12px}
+.card.pri{border-color:var(--accent)}
+h1{margin:0;font:700 24px Georgia,serif;color:var(--accent)}p{margin:0}
+.hint{color:var(--muted);font-size:15px}
+.btn{font:700 19px system-ui,sans-serif;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--ink);padding:14px 18px;min-height:56px;cursor:pointer;width:100%}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.btn:disabled{opacity:.5}
+.num{font:800 54px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.1em;text-align:center;background:var(--gold-soft);color:var(--gold);border:3px dashed var(--gold);border-radius:16px;padding:14px}
+.cand{display:flex;align-items:center;gap:14px;width:100%;text-align:left;font:600 19px system-ui,sans-serif;padding:14px;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--ink);min-height:60px;cursor:pointer}
+.cand i{flex:0 0 32px;height:32px;border-radius:9px;border:2px solid var(--muted);display:grid;place-items:center;font-style:normal;font-weight:900}
+.cand.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--surface))}.cand.on i{background:var(--ok);border-color:var(--ok);color:#fff}
+.cand.br{border-style:dashed;color:var(--muted)}
+.lista{display:grid;gap:8px}
+.ok{border-color:var(--ok)}.ok h1{color:var(--ok)}
+.erro{color:var(--danger);font-weight:600}
+.sticky{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:10px;display:grid;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+input{font:700 22px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;padding:12px;border-radius:12px;border:2px solid var(--line);width:100%;text-transform:uppercase;background:var(--surface);color:var(--ink)}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px;z-index:9}.dlg>div{background:var(--surface);border-radius:18px;padding:20px;width:min(520px,100%);display:grid;gap:12px;max-height:90vh;overflow:auto}
+.dlg ul{margin:0;padding-left:22px;font-weight:700;font-size:19px}
+.st{font-size:14px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<header><small>Assistente IPIBV Atas</small><b>Votação</b></header>
+<main id="app"><div class="card"><p>Carregando…</p></div></main>
+<script>
+(function(){
+const $=s=>document.querySelector(s),app=$("#app");
+const REL="https://ntfy.sh/",B32="0123456789ABCDEFGHJKMNPQRSTVWXYZ",K="ipibv-votacao";
+const LS={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const b64e=u=>{let s="";for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)},b64d=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function sha(t){return new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t)))}
+const hex=(u,n)=>[...u.slice(0,n)].map(x=>x.toString(16).padStart(2,"0")).join("");
+let KEY=null;async function key(tok){if(!KEY)KEY=crypto.subtle.importKey("raw",await sha(tok+"|ipibv-chave"),"AES-GCM",false,["encrypt","decrypt"]);return KEY}
+async function topic(tok,ch){return"ipibv"+hex(await sha(tok+"|"+ch),12)}
+async function zip(u,dir){if(typeof CompressionStream==="undefined")return null;const st=new Blob([u]).stream().pipeThrough(dir?new CompressionStream("deflate-raw"):new DecompressionStream("deflate-raw"));return new Uint8Array(await new Response(st).arrayBuffer())}
+async function pack(tok,obj){let u=new TextEncoder().encode(JSON.stringify(obj)),z=0;try{const c=await zip(u,true);if(c){u=c;z=1}}catch(e){}const iv=crypto.getRandomValues(new Uint8Array(12));const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},await key(tok),u));const o=new Uint8Array(13+ct.length);o[0]=z;o.set(iv,1);o.set(ct,13);return b64e(o)}
+async function open_(tok,t){const o=b64d(t);let u=new Uint8Array(await crypto.subtle.decrypt({name:"AES-GCM",iv:o.slice(1,13)},await key(tok),o.slice(13)));if(o[0])u=await zip(u,false);return JSON.parse(new TextDecoder().decode(u))}
+async function pub(tok,ch,obj){const body=await pack(tok,obj);const url=REL+await topic(tok,ch);try{const r=await fetch(url,{method:"POST",body});if(!r.ok)throw new Error(r.status)}catch(e){await fetch(url,{method:"POST",body,mode:"no-cors"})}}
+const ecAlg={name:"ECDH",namedCurve:"P-256"};
+async function ecPub(j){return crypto.subtle.importKey("jwk",{kty:j.kty,crv:j.crv,x:j.x,y:j.y,ext:true},ecAlg,true,[])}
+async function ecK(priv,pubJ){return crypto.subtle.deriveKey({name:"ECDH",public:await ecPub(pubJ)},priv,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+async function seal(priv,pubJ,obj){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},await ecK(priv,pubJ),new TextEncoder().encode(JSON.stringify(obj))));return{iv:b64e(iv),ct:b64e(ct)}}
+async function unseal(priv,pubJ,box){const u=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(box.iv)},await ecK(priv,pubJ),b64d(box.ct));return JSON.parse(new TextDecoder().decode(u))}
+async function fp(j){return hex(await sha(j.crv+"|"+j.x+"|"+j.y),8)}
+const rnd=n=>{const r=crypto.getRandomValues(new Uint8Array(n));return[...r].map(x=>B32[x%32]).join("")};
+/* estado */
+const h=new URLSearchParams((location.hash||"").replace(/^#/,""));let S=LS.get(K)||{};
+const tok=(h.get("v")||"").toUpperCase(),kfp=(h.get("k")||"").toLowerCase();
+if(tok&&S.tok!==tok)S={tok,kfp};if(kfp)S.kfp=kfp;LS.set(K,S);
+let INFO=null,MAINPUB=null,sel=[],aguardaAck=null,ackT=null,pedT=null,es=null,vistos=new Set(),erroMsg="";
+const salva=()=>LS.set(K,S);
+if(!window.crypto||!crypto.subtle||!window.EventSource||!S.tok){app.innerHTML='<div class="card"><h1>Não foi possível abrir</h1><p>'+(!S.tok?"Abra esta página pelo QR code mostrado pela mesa.":"Este navegador não permite a votação segura. Use o Safari ou o Chrome atualizados.")+'</p></div>';return}
+async function conecta(){if(es)try{es.close()}catch(e){}const t1=await topic(S.tok,"ve"),t2=await topic(S.tok,"vr");es=new EventSource(REL+t1+","+t2+"/sse?since=2h");
+  es.onopen=()=>{conOk=true;render()};es.onerror=()=>{conOk=false;render()};
+  es.onmessage=async ev=>{try{const d=JSON.parse(ev.data);if(d.event!=="message"||!d.message||vistos.has(d.id))return;vistos.add(d.id);const o=await open_(S.tok,d.message);if(!conOk){conOk=true}await recebe(o,d.time||0)}catch(e){}}}
+let conOk=false,infoT=0;
+async function recebe(o,tm){
+  if(o.k==="info"){if(tm<infoT)return;infoT=tm;if(o.fim){INFO={fim:1};render();return}if(o.pub){const f=await fp(o.pub);if(S.kfp&&f!==S.kfp)return;MAINPUB=o.pub}const ant=INFO&&INFO.eid;INFO=o.e||null;if(INFO&&INFO.eid!==ant){sel=[]}render();return}
+  if(o.k==="lib"&&S.pedido&&o.rid===S.pedido.rid&&!S.code){try{const priv=await crypto.subtle.importKey("jwk",S.pedido.priv,ecAlg,true,["deriveKey"]);const d=await unseal(priv,o.epub,o.box);if(d.code){S.code=d.code;salva();clearInterval(pedT);render()}}catch(e){}return}
+  if((o.k==="ok"||o.k==="nao")&&aguardaAck&&o.h===aguardaAck.h){clearTimeout(ackT);const eid=aguardaAck.eid;aguardaAck=null;if(o.k==="ok"){S.votos=S.votos||{};S.votos[eid]=o.comp||"✓";S.ultEid=eid;salva();sel=[]}else erroMsg=o.motivo||"Voto não aceito.";render()}}
+async function pedir(){const kp=await crypto.subtle.generateKey(ecAlg,true,["deriveKey"]);const rid=String(Math.floor(1000+Math.random()*9000));
+  S.pedido={rid,priv:await crypto.subtle.exportKey("jwk",kp.privateKey),pub:await crypto.subtle.exportKey("jwk",kp.publicKey),em:Date.now()};salva();render();envPed()}
+async function envPed(){const p=S.pedido;if(!p||S.code)return;try{await pub(S.tok,"vq",{k:"pedido",rid:p.rid,pub:p.pub})}catch(e){}clearInterval(pedT);let n=0;pedT=setInterval(()=>{if(S.code||++n>20){clearInterval(pedT);return}pub(S.tok,"vq",{k:"pedido",rid:p.rid,pub:p.pub}).catch(()=>{})},25000)}
+async function votar(){if(!INFO||!MAINPUB||!S.code)return;const eid=INFO.eid,votos=sel.length?sel.slice():["BRANCO"];const hh=hex(await sha(S.code+"|"+eid),8);
+  const kp=await crypto.subtle.generateKey(ecAlg,true,["deriveKey"]);const box=await seal(kp.privateKey,MAINPUB,{code:S.code,eid,votos});const msg={k:"voto",epub:await crypto.subtle.exportKey("jwk",kp.publicKey),box};
+  aguardaAck={h:hh,eid};erroMsg="";render();let tent=0;const env=async()=>{try{await pub(S.tok,"vb",msg)}catch(e){}ackT=setTimeout(()=>{if(aguardaAck&&++tent<6)env();else if(aguardaAck){aguardaAck=null;erroMsg="Não houve confirmação. Verifique a internet e toque em Confirmar de novo.";render()}},15000)};env()}
+function confirma(){const nomes=sel.length?sel.map(id=>(INFO.cands.find(c=>c[0]===id)||[0,id])[1]):["Voto em branco"];const d=document.createElement("div");d.className="dlg";
+  d.innerHTML='<div><h1>Confirma o seu voto?</h1><ul>'+nomes.map(n=>"<li>"+esc(n)+"</li>").join("")+'</ul><p class="hint">Depois de confirmar não dá para mudar. O voto é secreto: ele não fica ligado ao seu nome.</p><button class="btn primary" id="dOk">✓ Confirmar voto</button><button class="btn" id="dNao">Voltar e corrigir</button></div>';
+  document.body.appendChild(d);d.querySelector("#dOk").onclick=()=>{d.remove();votar()};d.querySelector("#dNao").onclick=()=>d.remove()}
+function render(){const rodape='<p class="st">'+(conOk?"📶 Conectado":"⏳ Conectando…")+"</p>";
+  if(INFO&&INFO.fim){app.innerHTML='<div class="card"><h1>Votação pelo celular encerrada</h1><p>Obrigado pela participação.</p></div>';return}
+  if(!S.code){if(!S.pedido){app.innerHTML='<div class="card pri"><h1>Bem-vindo(a) à votação</h1><p>Para votar pelo celular, peça o seu código secreto. A mesa vai conferir e liberar.</p><button class="btn primary" id="bPed">🔑 Pedir código de votação</button><p class="hint">O código chega só neste celular. O seu voto não fica ligado ao seu nome.</p></div>'+rodape;return}
+    app.innerHTML='<div class="card pri"><h1>Mostre esta tela à mesa</h1><p>Número do seu pedido:</p><div class="num">'+esc(S.pedido.rid)+'</div><p>Aguarde: a mesa confere o número e toca em <b>Liberar</b>. O código chega aqui sozinho.</p><p class="hint">Não feche esta página.</p></div>'+rodape;return}
+  if(aguardaAck){app.innerHTML='<div class="card"><h1>Enviando o seu voto…</h1><p>Aguarde a confirmação da mesa. Não feche esta página.</p></div>'+rodape;return}
+  if(!INFO){app.innerHTML='<div class="card"><h1>✓ Código recebido</h1><p>Aguarde a mesa abrir a votação.</p></div>'+rodape;return}
+  const ja=S.votos&&S.votos[INFO.eid];
+  if(ja){app.innerHTML='<div class="card ok"><h1>✓ Seu voto foi registrado</h1><p>'+esc(INFO.cargo)+" · "+INFO.rodada+'º escrutínio</p><p>Comprovante: <b style="font-family:ui-monospace,monospace;font-size:22px">'+esc(ja)+'</b></p><p class="hint">Se houver outro escrutínio, esta tela mostra a nova votação sozinha. Pode deixar aberta.</p></div>'+rodape;return}
+  if(!INFO.aberta){app.innerHTML='<div class="card"><h1>Votação deste escrutínio encerrada</h1><p>Aguarde o próximo escrutínio, se houver.</p></div>'+rodape;return}
+  app.innerHTML='<div class="card pri"><h1>'+esc(INFO.cargo)+" · "+INFO.rodada+'º escrutínio</h1><p>Escolha <b>até '+INFO.vagas+'</b> nome'+(INFO.vagas>1?"s":"")+'. Toque de novo para desmarcar.</p>'+(erroMsg?'<p class="erro">'+esc(erroMsg)+"</p>":"")+'</div><div class="lista">'+INFO.cands.map(([id,n])=>'<button class="cand'+(sel.includes(id)?" on":"")+'" data-c="'+esc(id)+'"><i>'+(sel.includes(id)?"✓":"")+"</i>"+esc(n)+"</button>").join("")+'</div><div class="sticky"><p class="st"><b>'+sel.length+" de "+INFO.vagas+"</b> escolhido"+(sel.length!==1?"s":"")+(sel.length?"":" · sem escolha = voto em branco")+'</p><button class="btn primary" id="bVot">'+(sel.length?"Revisar e confirmar":"Votar em branco")+"</button></div>"+rodape}
+app.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;if(t.id==="bPed")pedir();else if(t.id==="bVot")confirma();else if(t.dataset.c){const id=t.dataset.c,i=sel.indexOf(id);if(i>=0)sel.splice(i,1);else if(sel.length<INFO.vagas)sel.push(id);else{erroMsg="Você já escolheu "+INFO.vagas+". Desmarque um nome para trocar.";}render();erroMsg=""}});
+render();conecta();if(S.pedido&&!S.code)envPed();
+})();
+</script>
+</body>
+</html>
